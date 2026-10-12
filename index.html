@@ -130,6 +130,8 @@ canvas{display:block;image-rendering:pixelated}
 
 /* prompts */
 .pr{margin-top:5vh}
+.pr:first-child{margin-top:0}
+.pl .e{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .pr-hd{display:flex;align-items:center;justify-content:space-between;gap:20px;border-bottom:2px solid var(--toner);padding-bottom:8px;margin-bottom:14px}
 .pr h3{font-family:var(--heavy);font-weight:900;font-size:clamp(22px,1.8vw,28px)}
 .pr .cp{font:14px var(--type);background:var(--toner);color:var(--strip);border:0;padding:5px 16px;cursor:pointer}
@@ -201,7 +203,7 @@ canvas{display:block;image-rendering:pixelated}
   </div>
 </section>
 
-<!-- ───────── 文风提示词：每条一个 <script type="text/plain" id="prompt-<slug>" data-title="标题">，正文原样显示 ───────── -->
+<!-- ───────── 提示词：每条一个 <script type="text/plain" id="prompt-<slug>" data-title="标题">，正文原样显示 ───────── -->
 <script type="text/plain" id="prompt-ppt" data-title="导师汇报 PPT：字少、证据厚">
 给导师汇报的技术 PPT，按"字少、证据厚"来做。每页都要同时做到两点：
 一眼看出结论；看得出干了很多活，并且结果是严谨收敛的。
@@ -436,7 +438,7 @@ LaTeX 只用于说明公式结构，图片中应画成真正手写的分式和�
 
 <script src="dither.js"></script>
 <script>
-const SECTIONS=[['words','文字','window',2],['music','音乐','crowd',11],['photos','照片','sea',8],['work','项目','chip',3],['prompts','文风提示词','corridor',2],['contact','写信','house',4]];
+const SECTIONS=[['words','文字','window',2],['music','音乐','crowd',11],['photos','照片','sea',8],['work','项目','chip',3],['prompts','提示词','corridor',2],['contact','写信','house',4]];
 const NAME=Object.fromEntries(SECTIONS.map(s=>[s[0],s[1]]));
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
@@ -454,6 +456,10 @@ const POSTS=[...document.querySelectorAll('script[id^="post-"]')].map(el=>{
   return{id:el.id.slice(5),t:el.dataset.title,d:el.dataset.date,u:el.dataset.updated,html,toc,n:text.replace(/\s/g,'').length,e:blocks.find(b=>!/^[一二三四五六七八九十]+、/.test(b))};
 }).sort((a,b)=>b.d.localeCompare(a.d));
 
+/* prompts: parsed from <script type="text/plain" id="prompt-*">, page order */
+const PROMPTS=[...document.querySelectorAll('script[id^="prompt-"]')].map(el=>{const text=el.textContent.trim();
+  return{id:el.id.slice(7),t:el.dataset.title,text,n:text.replace(/\s/g,'').length,e:text.split(/\n\s*\n/)[0]}});
+
 const empty=(k,note)=>({cls:'',crumbs:[[NAME[k]]],html:`<div class="ttl"><h2 class="x">${NAME[k]}</h2><p>${note}</p></div><div class="empty"><span class="stamp">暂无</span></div>`});
 const V={
  words(){return{cls:'',crumbs:[['文字']],html:`
@@ -469,10 +475,12 @@ const V={
  music:()=>empty('music','自己录的歌和最近在听的。'),
  photos:()=>empty('photos','拍的照片，按卷整理。'),
  work:()=>empty('work','做过的项目和一些工具。'),
- prompts(){const P=[...document.querySelectorAll('script[id^="prompt-"]')];
-  if(!P.length)return empty('prompts','写东西时给 AI 的文风要求，可以直接复制。');
-  return{cls:'',crumbs:[['文风提示词']],after:copyBtns,html:`<div class="ttl"><h2 class="x">文风提示词</h2><p>写东西时给 AI 的文风要求，可以直接复制。</p></div>
-  ${P.map(el=>`<section class="pr"><div class="pr-hd"><h3>${esc(el.dataset.title)}</h3><button class="cp">复制</button></div><pre>${esc(el.textContent.trim())}</pre></section>`).join('')}`}},
+ prompts(){if(!PROMPTS.length)return empty('prompts','平时给 AI 用的提示词，点进去复制。');
+  return{cls:'',crumbs:[['提示词']],html:`<div class="ttl"><h2 class="x">提示词</h2><p>平时给 AI 用的提示词，点进去复制。共 ${PROMPTS.length} 条。</p></div>
+  <div class="posts pl">${PROMPTS.map((p,i)=>`<a href="#/prompts/${p.id}"><span class="d">${String(i+1).padStart(2,'0')}</span><span class="t">${esc(p.t)}</span><span class="n">${p.n} 字 →</span><span class="e">${esc(p.e)}</span></a>`).join('')}</div>`}},
+ prompt(id){const i=PROMPTS.findIndex(p=>p.id===id);if(i<0)return null;const p=PROMPTS[i],pv=PROMPTS[i-1],nx=PROMPTS[i+1];
+  return{cls:'',crumbs:[['提示词','#/prompts'],[p.t]],after:copyBtns,html:`<section class="pr"><div class="pr-hd"><h3>${esc(p.t)}</h3><button class="cp">复制</button></div><pre>${esc(p.text)}</pre></section>
+  <div class="pn">${pv?`<a href="#/prompts/${pv.id}">← ${esc(pv.t)}</a>`:'<span></span>'}${nx?`<a href="#/prompts/${nx.id}">${esc(nx.t)} →</a>`:'<a href="#/prompts">← 全部提示词</a>'}</div>`}},
  contact:()=>empty('contact','邮箱和其他联系方式。'),
 };
 
@@ -493,8 +501,8 @@ function route(){
   const raw=location.hash.replace(/^#\/?/,'');
   if(raw&&!raw.includes('/')&&document.getElementById(raw)&&!atHome)return; // in-page anchor (toc)
   const [a,b]=raw.split('/').filter(Boolean).map(decodeURIComponent);
-  if(!a||!V[a]||a==='post'){showHome();return}
-  const v=a==='words'&&b?V.post(b):V[a]();
+  if(!a||!V[a]||a==='post'||a==='prompt'){showHome();return}
+  const v=b&&a==='words'?V.post(b):b&&a==='prompts'?V.prompt(b):V[a]();
   if(!v){location.replace('#/'+a);return}
   const my=++token,fromHome=atHome,deep=!!b;atHome=false;
   home.classList.add('away');
